@@ -26,7 +26,9 @@ mkdir -p "${VM_ROOT}" "${LOG_ROOT}"
 command -v qemu-system-x86_64 >/dev/null || fail "QEMU is not installed"
 command -v qemu-img >/dev/null || fail "qemu-img is not installed"
 NOVNC_PROXY="$(command -v novnc_proxy || true)"
-[[ -n "${NOVNC_PROXY}" ]] || [[ -x /usr/share/novnc/utils/novnc_proxy ]] && NOVNC_PROXY="/usr/share/novnc/utils/novnc_proxy"
+if [[ -z "${NOVNC_PROXY}" && -x /usr/share/novnc/utils/novnc_proxy ]]; then
+  NOVNC_PROXY="/usr/share/novnc/utils/novnc_proxy"
+fi
 [[ -n "${NOVNC_PROXY}" ]] || fail "noVNC is not installed"
 [[ -f "${ISO}" ]] || fail "Windows 10 ISO not found at ${ISO}; provide a licensed ISO via WORKSTATION_WINDOWS_ISO"
 
@@ -64,6 +66,7 @@ VNC_DISPLAY=$((VNC_PORT - 5900))
 QEMU_ARGS=(
   -name "WorkStation-Windows-10-${SESSION_NAME}"
   -machine q35
+  -bios /usr/share/OVMF/OVMF_CODE_4M.fd
   -accel "${ACCEL}"
   -cpu max
   -smp "${CPUS}"
