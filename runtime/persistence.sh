@@ -1,21 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Repository-backed OS file persistence.
-# Usage:
-#   persistence.sh load <Osname> <target>
-#   persistence.sh save <Osname> <source>
-#
-# The repository is expected to be the current working tree.
-# GitHub credentials are provided by the environment, never by this script.
-
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 OS_ROOT="${ROOT}/Pc/Os"
 RUNTIME_ROOT="${WORKSTATION_RUNTIME_ROOT:-/var/lib/workstation}"
 LOCK_ROOT="${RUNTIME_ROOT}/locks"
 
 usage() {
-  echo "usage: $0 {load|save} <Osname> <path>" >&2
+  echo "usage: ${0##*/} {load|save} <Osname> <path>" >&2
   exit 2
 }
 
@@ -25,56 +17,69 @@ valid_os_name() {
 
 safe_files_root() {
   local os="$1"
-  valid_os_name "$os" || { echo "invalid OS name" >&2; exit 2; }
+  valid_os_name "${os}" || { echo "invalid OS name" >&2; exit 2; }
   printf '%s\n' "${OS_ROOT}/${os}/Files"
 }
 
 acquire_lock() {
-  mkdir -p "$LOCK_ROOT"
-  local lock="${LOCK_ROOT}/${1}.lock"
-  if ! mkdir "$lock" 2>/dev/null; then
-    echo "persistence is already locked for OS: $1" >&2
+  local os="$1"
+  mkdir -p "${LOCK_ROOT}"
+  local lock="${LOCK_ROOT}/${os}.lock"
+  if ! mkdir "${lock}" 2>/dev/null; then
+    echo "persistence is already locked for OS: ${os}" >&2
     exit 1
   fi
-  trap 'rmdir -- "$lock" 2>/dev/null || true' EXIT
+  LOCK_PATH="${lock}"
 }
 
+release_lock() {
+  [[ -n "${LOCK_PATH:-}" ]] && rmdir -- "${LOCK_PATH}" 2>/dev/null || true
+}
+trap release_lock EXIT
+
 load_os() {
-  local os="$1"
-  local target="$2"
+  local os="$1" target="$2"
   local source
-  source="$(safe_files_root "$os")"
-
-  acquire_lock "$os"
-  mkdir -p "$source" "$target"
-
-  # Pull the latest persisted state before restoring it.
-  git -C "$ROOT" pull --ff-only origin "${WORKSTATION_GIT_BRANCH:-main}"
-
-  # rsync keeps the target clean while preserving the tracked user tree.
+  source="$(safe_files_root "${os}")"
+  acquire_lock "${os}"
+  mkdir -p "${source}" "${target}"
   rsync -a --delete "${source}/" "${target}/"
 }
 
+reject_persisted_secrets() {
+  local root="$1"
+  local bad
+  bad="$(find "${root}" -type f \\( \
+    -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
+    -o -name '*id_rsa*' -o -name '*id_ed25519*' -o -name 'credentials.json' \
+  \\) -print -quit)"
+  if [[ -n "${bad}" ]]; then
+    echo "refusing to persist probable secret: ${bad}" >&2
+    return 1
+  fi
+}
+
 save_os() {
-  local os="$1"
-  local source="$2"
+  local os="$1" source="$2"
   local destination
-  destination="$(safe_files_root "$os")"
+  destination="$(safe_files_root "${os}")"
 
-  acquire_lock "$os"
-  mkdir -p "$destination"
-
+  [[ -d "${source}" ]] || { echo "source does not exist: ${source}" >&2; exit 1; }
+  acquire_lock "${os}"
+  mkdir -p "${destination}"
+  reject_persisted_secrets "${source}"
   rsync -a --delete --exclude='.git/' "${source}/" "${destination}/"
 
-  git -C "$ROOT" add -- "${destination#"$ROOT/"}"
+  local relative="${destination#${ROOT}/}"
+  git -C "${ROOT}" add -- "${relative}"
 
-  if git -C "$ROOT" diff --cached --quiet -- "${destination#"$ROOT/"}"; then
-    echo "no persistence changes for $os"
+  if git -C "${ROOT}" diff --cached --quiet -- "${relative}"; then
+    echo "no persistence changes for ${os}"
     return 0
   fi
 
-  git -C "$ROOT" commit -m "Persist files for $os"
-  git -C "$ROOT" push origin "${WORKSTATION_GIT_BRANCH:-main}"
+  git -C "${ROOT}" -c user.name="WorkStation" -c user.email="workstation@users.noreply.github.com" commit -m "Persist files for ${os}"
+  git -C "${ROOT}" push origin "${WORKSTATION_GIT_BRANCH:-main}"
 }
 
 case "${1:-}" in
