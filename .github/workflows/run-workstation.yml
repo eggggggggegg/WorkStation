@@ -57,5 +57,5 @@ jobs:
 
       - name: Start workstation
         run: |
-          chmod +x runtime/run-workstation.sh runtime/persistence.sh
+          chmod +x runtime/run-workstation.sh runtime/persistence.sh runtime/*.sh
           runtime/run-workstation.sh
