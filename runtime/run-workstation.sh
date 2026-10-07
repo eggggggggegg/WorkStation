@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+RUNTIME_ROOT="${WORKSTATION_RUNTIME_ROOT:-/var/lib/workstation}"
+SESSION_ROOT="${RUNTIME_ROOT}/sessions/${WORKSTATION_NAME}"
+HOME_ROOT="${SESSION_ROOT}/home"
+LOG_ROOT="${SESSION_ROOT}/logs"
+SAFE_NAME="$(printf '%s' "${WORKSTATION_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')"
+CONTAINER_NAME="workstation-${SAFE_NAME}"
+PORT="${WORKSTATION_PORT:-8080}"
+
+die() { echo "WorkStation: $*" >&2; exit 1; }
+[[ "${WORKSTATION_NAME:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$ ]] || die "invalid workstation name"
+[[ -n "${WORKSTATION_PASSWORD:-}" && "${WORKSTATION_PASSWORD}" != *$'\\n'* && "${WORKSTATION_PASSWORD}" != *$'\\r'* ]] || die "password is required"
+command -v docker >/dev/null || die "Docker is required"
+command -v git >/dev/null || die "Git is required"
+command -v rsync >/dev/null || die "rsync is required"
+
+case "${WORKSTATION_OS:-}" in
+  Ubuntu-26.04) IMAGE="ghcr.io/selkies-project/selkies/desktop:latest-ubuntu26.04" ;;
+  Debian-Trixie) IMAGE="ghcr.io/selkies-project/selkies/desktop:latest-debiantrixie" ;;
+  *) die "unsupported OS: ${WORKSTATION_OS:-}" ;;
+esac
+
+mkdir -p "${HOME_ROOT}" "${LOG_ROOT}"
+
+cleanup() {
+  set +e
+  docker stop -t 20 "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+  if [[ -n "${TUNNEL_PID:-}" ]]; then
+    kill "${TUNNEL_PID}" >/dev/null 2>&1 || true
+    wait "${TUNNEL_PID}" >/dev/null 2>&1 || true
+  fi
+  "${ROOT}/runtime/persistence.sh" save "${WORKSTATION_OS}" "${HOME_ROOT}" || echo "WorkStation: persistence save failed" >&2
+}
+trap cleanup EXIT INT TERM
+
+echo "WorkStation: restoring ${WORKSTATION_OS}..."
+"${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
+
+docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+echo "WorkStation: starting ${IMAGE}..."
+
+docker run -d \
+  --name "${CONTAINER_NAME}" \
+  --shm-size=2g \
+  -p "127.0.0.1:${PORT}:8080" \
+  -v "${HOME_ROOT}:/home/ubuntu" \
+  -e "PASSWD=${WORKSTATION_PASSWORD}" \
+  -e "SELKIES_BASIC_AUTH_USER=ubuntu" \
+  -e "SELKIES_BASIC_AUTH_PASSWORD=${WORKSTATION_PASSWORD}" \
+  -e "SELKIES_MODE=webrtc" \
+  "${IMAGE}" >/dev/null
+
+echo "WorkStation: local address: https://127.0.0.1:${PORT}"
+
+if command -v cloudflared >/dev/null 2>&1; then
+  echo "WorkStation: starting temporary Cloudflare Quick Tunnel..."
+  cloudflared tunnel --url "http://127.0.0.1:${PORT}" 2>&1 | tee "${LOG_ROOT}/cloudflared.log" &
+  TUNNEL_PID=$!
+  for _ in {1..30}; do
+    URL="$(grep -Eo 'https://[-a-z0-9]+\\.trycloudflare\\.com' "${LOG_ROOT}/cloudflared.log" | head -n1 || true)"
+    [[ -n "${URL}" ]] && echo "WorkStation: public URL: ${URL}" && break
+    sleep 1
+  done
+else
+  echo "WorkStation: cloudflared not installed; use the local address or install cloudflared on the runner."
+fi
+
+echo "WorkStation: running. Keep this workflow active while using the desktop."
+echo "WorkStation: password is intentionally not printed."
+docker wait "${CONTAINER_NAME}" >/dev/null
