@@ -24,6 +24,9 @@ case "${WORKSTATION_OS:-}" in
 esac
 
 mkdir -p "${HOME_ROOT}" "${LOG_ROOT}"
+# The Selkies desktop user is ubuntu (UID 1000). GitHub-hosted runners use a different host UID,
+# so make the mounted home writable or browser profiles can fail to start.
+sudo chown -R 1000:1000 "${HOME_ROOT}"
 
 GPU_ARGS=()
 if command -v nvidia-smi >/dev/null 2>&1 && docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'; then
@@ -46,14 +49,15 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+echo "WorkStation: restoring ${WORKSTATION_OS}..."
+"${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
+
 mkdir -p "${HOME_ROOT}/.config/workstation"
 cat > "${HOME_ROOT}/.config/workstation/profile.yaml" <<EOF
 name: "${WORKSTATION_NAME}"
 profile: default
 EOF
-
-echo "WorkStation: restoring ${WORKSTATION_OS}..."
-"${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
+sudo chown -R 1000:1000 "${HOME_ROOT}"
 
 docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
 echo "WorkStation: starting ${IMAGE}..."
@@ -66,7 +70,7 @@ docker run -d \
   -e "PASSWD=${WORKSTATION_PASSWORD}" \
   -e "SELKIES_BASIC_AUTH_USER=ubuntu" \
   -e "SELKIES_BASIC_AUTH_PASSWORD=${WORKSTATION_PASSWORD}" \
-  -e "SELKIES_MODE=webrtc" \
+  -e "SELKIES_MODE=websockets" \
   -e "SELKIES_ENABLE_HTTPS=false" \
   "${GPU_ARGS[@]}" \
   "${IMAGE}" >/dev/null
