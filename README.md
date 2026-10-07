@@ -1,5 +1,7 @@
 # WorkStation
 
+WARNING THIS WAS MADE BY AI SO IF YOU DO NOT LIKE THAT KEWL BUT UH YKNOW LEAVE OR SUM IF U DONT WNANA LOSE IT
+
 A browser-accessible workstation designed around a clean, reproducible filesystem, GPU acceleration, Selkies, dwm, and a Cloudflare Quick Tunnel.
 
 ## Goals
