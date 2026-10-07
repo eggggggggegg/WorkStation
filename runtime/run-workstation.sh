@@ -75,8 +75,9 @@ docker run -d \
   "${GPU_ARGS[@]}" \
   "${IMAGE}" >/dev/null
 
-# Configure GUI app launchers from inside the desktop container, where the
-# installed applications and X11 environment actually exist.
+# Restore cached system apps first, then configure GUI launchers from inside
+# the desktop container where the installed applications and X11 environment exist.
+docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/provision-apps.sh || echo "WorkStation: app restore warning" >&2
 docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/configure-desktop-apps.sh /home/ubuntu || echo "WorkStation: desktop app configuration warning" >&2
 
 echo "WorkStation: local address: http://127.0.0.1:${PORT}"
