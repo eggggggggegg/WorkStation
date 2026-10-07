@@ -43,6 +43,10 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Mask workstation password
+        run: |
+          printf '::add-mask::%s\n' "$WORKSTATION_PASSWORD"
+
       - name: Start workstation
         run: |
           chmod +x runtime/run-workstation.sh runtime/persistence.sh
