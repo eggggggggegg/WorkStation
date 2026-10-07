@@ -20,7 +20,7 @@ case "${choice}" in
   1)
     read -r -p "APT package name(s): " packages
     # shellcheck disable=SC2086
-    exec "${INSTALLER}" apt ${packages}
+    exec /bin/bash "${INSTALLER}" apt ${packages}
     ;;
   2)
     read -r -p "Path to .deb: " file
