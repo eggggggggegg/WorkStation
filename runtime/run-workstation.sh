@@ -28,6 +28,10 @@ esac
 
 mkdir -p "${HOME_ROOT}" "${LOG_ROOT}"
 
+if ! docker info >/dev/null 2>&1; then die "Docker daemon is unavailable"; fi
+if [[ "${PORT}" =~ ^[0-9]+$ ]] && (( PORT < 1024 || PORT > 65535 )); then die "invalid workstation port: ${PORT}"; fi
+if command -v ss >/dev/null 2>&1 && ss -ltn "( sport = :${PORT} )" 2>/dev/null | grep -q LISTEN; then die "port ${PORT} is already in use"; fi
+
 GPU_ARGS=()
 if command -v nvidia-smi >/dev/null 2>&1 && docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'; then
   GPU_ARGS+=(--gpus all)
@@ -64,6 +68,8 @@ sudo chown -R 1000:1000 "${HOME_ROOT}"
 docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
 echo "WorkStation: starting ${IMAGE}..."
 
+docker pull "${IMAGE}" >>"${LOG_ROOT}/docker-pull.log" 2>&1 || { tail -n 80 "${LOG_ROOT}/docker-pull.log" >&2 || true; die "Docker image pull failed"; }
+
 docker run -d \
   --name "${CONTAINER_NAME}" \
   --shm-size=2g \
@@ -76,14 +82,28 @@ docker run -d \
   -e "SELKIES_MODE=websockets" \
   -e "SELKIES_ENABLE_HTTPS=false" \
   "${GPU_ARGS[@]}" \
-  "${IMAGE}" >/dev/null
+  "${IMAGE}" >"${LOG_ROOT}/docker-run.log" 2>&1 || { tail -n 80 "${LOG_ROOT}/docker-run.log" >&2 || true; docker logs --tail 80 "${CONTAINER_NAME}" >&2 2>/dev/null || true; die "desktop container failed to start"; }
+
+ready=0
+for _ in {1..60}; do
+  if ! docker inspect --format "{{.State.Running}}" "${CONTAINER_NAME}" 2>/dev/null | grep -q true; then break; fi
+  if curl -fsS --max-time 2 "http://127.0.0.1:${PORT}/" >/dev/null 2>&1; then ready=1; break; fi
+  sleep 2
+done
+(( ready == 1 )) || { docker logs --tail 120 "${CONTAINER_NAME}" >&2 2>/dev/null || true; die "desktop service failed readiness check"; }
 
 # Restore cached system apps first, then configure GUI launchers from inside
 # the desktop container where the installed applications and X11 environment exist.
-docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/provision-apps.sh || echo "WorkStation: app restore warning" >&2
-docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/configure-desktop-apps.sh /home/ubuntu || echo "WorkStation: desktop app configuration warning" >&2
+for _ in {1..10}; do docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/provision-apps.sh && break; sleep 2; done || echo "WorkStation: app restore warning" >&2
+for _ in {1..10}; do docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/configure-desktop-apps.sh /home/ubuntu && break; sleep 2; done || echo "WorkStation: desktop app configuration warning" >&2
 
 echo "WorkStation: local address: http://127.0.0.1:${PORT}"
+
+if command -v curl >/dev/null 2>&1; then
+  :
+else
+  die "curl is required for desktop readiness checks"
+fi
 
 if command -v cloudflared >/dev/null 2>&1; then
   echo "WorkStation: starting temporary Cloudflare Quick Tunnel..."
@@ -95,7 +115,7 @@ if command -v cloudflared >/dev/null 2>&1; then
     sleep 1
   done
 else
-  echo "WorkStation: cloudflared not installed; use the local address or install cloudflared on the runner."
+  die "cloudflared is required because the GitHub-hosted runner is not directly reachable from the browser"
 fi
 
 echo "WorkStation: running. Keep this workflow active while using the desktop."
