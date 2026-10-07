@@ -1,0 +1,16 @@
+name: Ubuntu-26.04
+type: container
+image: ghcr.io/selkies-project/selkies/desktop:latest-ubuntu26.04
+
+desktop:
+  streamer: selkies
+  transport: webrtc
+
+persistence:
+  files_path: Pc/Os/Ubuntu-26.04/Files
+  home_path: /home/ubuntu
+  restore_before_start: true
+  save_on_stop: true
+
+resources:
+  gpu: auto
