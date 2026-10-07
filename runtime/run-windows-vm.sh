@@ -18,13 +18,16 @@ NOVNC_LOG="${LOG_ROOT}/windows-novnc.log"
 QMP_SOCKET="${VM_ROOT}/qmp.sock"
 QEMU_PID=""
 NOVNC_PID=""
+TUNNEL_PID=""
 
 fail() { echo "WorkStation Windows-10: $*" >&2; exit 1; }
 
 mkdir -p "${VM_ROOT}" "${LOG_ROOT}"
 command -v qemu-system-x86_64 >/dev/null || fail "QEMU is not installed"
 command -v qemu-img >/dev/null || fail "qemu-img is not installed"
-command -v novnc_proxy >/dev/null || fail "noVNC is not installed"
+NOVNC_PROXY="$(command -v novnc_proxy || true)"
+[[ -n "${NOVNC_PROXY}" ]] || [[ -x /usr/share/novnc/utils/novnc_proxy ]] && NOVNC_PROXY="/usr/share/novnc/utils/novnc_proxy"
+[[ -n "${NOVNC_PROXY}" ]] || fail "noVNC is not installed"
 [[ -f "${ISO}" ]] || fail "Windows 10 ISO not found at ${ISO}; provide a licensed ISO via WORKSTATION_WINDOWS_ISO"
 
 ACCEL=""
@@ -49,6 +52,7 @@ fi
 cleanup() {
   set +e
   [[ -n "${NOVNC_PID}" ]] && kill "${NOVNC_PID}" >/dev/null 2>&1 || true
+  [[ -n "${TUNNEL_PID}" ]] && kill "${TUNNEL_PID}" >/dev/null 2>&1 || true
   [[ -n "${QEMU_PID}" ]] && kill "${QEMU_PID}" >/dev/null 2>&1 || true
   wait "${NOVNC_PID}" >/dev/null 2>&1 || true
   wait "${QEMU_PID}" >/dev/null 2>&1 || true
@@ -64,11 +68,11 @@ QEMU_ARGS=(
   -cpu max
   -smp "${CPUS}"
   -m "${RAM}"
-  -drive "file=${DISK},if=virtio,format=qcow2"
+  -drive "file=${DISK},if=ide,format=qcow2"
   -drive "file=${ISO},media=cdrom,readonly=on"
   -boot order=d,menu=on
   -device virtio-vga
-  -device virtio-net-pci,netdev=net0
+  -device e1000,netdev=net0
   -netdev user,id=net0
   -device ich9-intel-hda
   -device hda-duplex
@@ -125,7 +129,7 @@ PY
 
 unset WORKSTATION_VNC_PASSWORD
 
-novnc_proxy --listen "127.0.0.1:${WEB_PORT}" --vnc "127.0.0.1:${VNC_PORT}" --heartbeat 30 >>"${NOVNC_LOG}" 2>&1 &
+${NOVNC_PROXY} --listen "127.0.0.1:${WEB_PORT}" --vnc "127.0.0.1:${VNC_PORT}" --heartbeat 30 >>"${NOVNC_LOG}" 2>&1 &
 NOVNC_PID=$!
 
 sleep 2
@@ -133,7 +137,7 @@ kill -0 "${NOVNC_PID}" 2>/dev/null || { tail -n 80 "${NOVNC_LOG}" >&2 || true; f
 
 echo "WorkStation Windows-10: browser desktop is available on http://127.0.0.1:${WEB_PORT}"
 echo "WorkStation Windows-10: QEMU acceleration=${ACCEL}"
-echo "WorkStation Windows-10: VNC authentication is enabled"
+echo "WorkStation Windows-10: VNC authentication is enabled; enter the first 8 characters of the workstation password in noVNC"
 echo "WorkStation Windows-10: disk=${DISK}"
 echo "WorkStation Windows-10: ISO=${ISO}"
 
