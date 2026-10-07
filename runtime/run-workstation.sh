@@ -24,9 +24,6 @@ case "${WORKSTATION_OS:-}" in
 esac
 
 mkdir -p "${HOME_ROOT}" "${LOG_ROOT}"
-# The Selkies desktop user is ubuntu (UID 1000). GitHub-hosted runners use a different host UID,
-# so make the mounted home writable or browser profiles can fail to start.
-sudo chown -R 1000:1000 "${HOME_ROOT}"
 
 GPU_ARGS=()
 if command -v nvidia-smi >/dev/null 2>&1 && docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'; then
@@ -45,6 +42,7 @@ cleanup() {
     kill "${TUNNEL_PID}" >/dev/null 2>&1 || true
     wait "${TUNNEL_PID}" >/dev/null 2>&1 || true
   fi
+  sudo chown -R "$(id -u):$(id -g)" "${HOME_ROOT}" >/dev/null 2>&1 || true
   "${ROOT}/runtime/persistence.sh" save "${WORKSTATION_OS}" "${HOME_ROOT}" || echo "WorkStation: persistence save failed" >&2
 }
 trap cleanup EXIT INT TERM
