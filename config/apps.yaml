@@ -1,0 +1,8 @@
+# Apps that WorkStation can provision automatically on startup.
+# Keep this list small: system packages are installed into the current
+# container and are recreated when a fresh desktop container starts.
+apps:
+  vscode:
+    enabled: false
+    installer: vscode
+    launch_command: "code --disable-gpu"
