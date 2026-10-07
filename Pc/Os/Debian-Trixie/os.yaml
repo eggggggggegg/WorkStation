@@ -1,0 +1,16 @@
+name: Debian-Trixie
+type: container
+image: ghcr.io/selkies-project/selkies/desktop:latest-debiantrixie
+
+desktop:
+  streamer: selkies
+  transport: webrtc
+
+persistence:
+  files_path: Pc/Os/Debian-Trixie/Files
+  home_path: /home/ubuntu
+  restore_before_start: true
+  save_on_stop: true
+
+resources:
+  gpu: auto
