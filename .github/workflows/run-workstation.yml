@@ -74,6 +74,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86 qemu-utils ovmf novnc websockify
 
+      - name: Download Windows 10 ISO
+        if: inputs.os == 'Windows-10'
+        run: |
+          chmod +x runtime/get-windows-iso.sh
+          runtime/get-windows-iso.sh
+
       - name: Start workstation
         run: |
           chmod +x runtime/run-workstation.sh runtime/persistence.sh runtime/*.sh
