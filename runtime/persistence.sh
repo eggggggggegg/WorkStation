@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 OS_ROOT="${ROOT}/Pc/Os"
-RUNTIME_ROOT="${WORKSTATION_RUNTIME_ROOT:-/var/lib/workstation}"
+RUNTIME_ROOT="${WORKSTATION_RUNTIME_ROOT:-${RUNNER_TEMP:-${ROOT}/.runtime}/workstation}"
 LOCK_ROOT="${RUNTIME_ROOT}/locks"
 
 usage() {
