@@ -55,10 +55,10 @@ load_os() {
 reject_persisted_secrets() {
   local root="$1"
   local bad
-  bad="$(find "${root}" -type f \\( \
+  bad="$(find "${root}" -type f \( \
     -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
     -o -name '*id_rsa*' -o -name '*id_ed25519*' -o -name 'credentials.json' \
-  \\) -print -quit)"
+  \) -print -quit)"
   if [[ -n "${bad}" ]]; then
     echo "refusing to persist probable secret: ${bad}" >&2
     return 1
