@@ -46,6 +46,12 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+mkdir -p "${HOME_ROOT}/.config/workstation"
+cat > "${HOME_ROOT}/.config/workstation/profile.yaml" <<EOF
+name: "${WORKSTATION_NAME}"
+profile: default
+EOF
+
 echo "WorkStation: restoring ${WORKSTATION_OS}..."
 "${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
 
