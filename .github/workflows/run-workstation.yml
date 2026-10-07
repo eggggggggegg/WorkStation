@@ -10,6 +10,7 @@ on:
         options:
           - Ubuntu-26.04
           - Debian-Trixie
+          - Windows-10
         default: Ubuntu-26.04
       name:
         description: "Name for this workstation session"
@@ -17,9 +18,19 @@ on:
         type: string
         default: workstation
       password:
-        description: "Selkies login password (workflow inputs are not secret)"
+        description: "Desktop/VNC login password (workflow inputs are not secret)"
         required: true
         type: string
+      windows_iso_path:
+        description: "Path to a licensed Windows 10 ISO on the runner"
+        required: false
+        type: string
+        default: "Pc/Os/Windows-10/Media/Windows.iso"
+      windows_allow_tcg:
+        description: "Allow very slow QEMU software emulation when KVM is unavailable"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -37,6 +48,8 @@ jobs:
       WORKSTATION_NAME: ${{ inputs.name }}
       WORKSTATION_OS: ${{ inputs.os }}
       WORKSTATION_PASSWORD: ${{ inputs.password }}
+      WORKSTATION_WINDOWS_ISO: ${{ inputs.windows_iso_path }}
+      WORKSTATION_WINDOWS_ALLOW_TCG: ${{ inputs.windows_allow_tcg }}
     steps:
       - name: Check out WorkStation
         uses: actions/checkout@v5
@@ -54,6 +67,12 @@ jobs:
       - name: Mask workstation password
         run: |
           printf '::add-mask::%s\n' "$WORKSTATION_PASSWORD"
+
+      - name: Install Windows VM dependencies
+        if: inputs.os == 'Windows-10'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf novnc websockify
 
       - name: Start workstation
         run: |
