@@ -16,11 +16,19 @@ repair_vscode_sandbox() {
 
 restore_appcenter() {
   if ! command -v snap >/dev/null 2>&1; then
-    echo "WorkStation: snap is not available; App Center will be skipped."
+    echo "WorkStation: snap is not available; installing the GNOME Software app store fallback."
+    if command -v sudo >/dev/null 2>&1; then
+      sudo apt-get update
+      sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y gnome-software || true
+    fi
     return 0
   fi
   if ! snap list snap-store >/dev/null 2>&1; then
-    sudo snap install snap-store || echo "WorkStation: App Center install failed; custom installer remains available." >&2
+    sudo snap install snap-store || {
+      echo "WorkStation: App Center snap failed; installing GNOME Software fallback." >&2
+      sudo apt-get update || true
+      sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y gnome-software || true
+    }
   fi
 }
 
