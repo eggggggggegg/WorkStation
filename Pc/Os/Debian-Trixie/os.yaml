@@ -4,7 +4,7 @@ image: ghcr.io/selkies-project/selkies/desktop:latest-debiantrixie
 
 desktop:
   streamer: selkies
-  transport: webrtc
+  transport: websockets
 
 persistence:
   files_path: Pc/Os/Debian-Trixie/Files
