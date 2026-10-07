@@ -35,7 +35,7 @@ fi
 ACCEL=""
 if [[ -e /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then
   ACCEL="kvm"
-elif [[ "${WORKSTATION_WINDOWS_ALLOW_TCG:-0}" == "1" ]]; then
+elif [[ "${WORKSTATION_WINDOWS_ALLOW_TCG:-0}" == "1" || "${WORKSTATION_WINDOWS_ALLOW_TCG:-0}" == "true" ]]; then
   ACCEL="tcg"
 else
   cat >&2 <<MSG
