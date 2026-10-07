@@ -25,6 +25,16 @@ esac
 
 mkdir -p "${HOME_ROOT}" "${LOG_ROOT}"
 
+GPU_ARGS=()
+if command -v nvidia-smi >/dev/null 2>&1 && docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'; then
+  GPU_ARGS+=(--gpus all)
+elif [[ -d /dev/dri ]]; then
+  GPU_ARGS+=(--device /dev/dri)
+  if [[ -e /dev/dri/renderD128 ]]; then
+    GPU_ARGS+=(--group-add "$(stat -c '%g' /dev/dri/renderD128)")
+  fi
+fi
+
 cleanup() {
   set +e
   docker stop -t 20 "${CONTAINER_NAME}" >/dev/null 2>&1 || true
@@ -51,6 +61,7 @@ docker run -d \
   -e "SELKIES_BASIC_AUTH_USER=ubuntu" \
   -e "SELKIES_BASIC_AUTH_PASSWORD=${WORKSTATION_PASSWORD}" \
   -e "SELKIES_MODE=webrtc" \
+  "${GPU_ARGS[@]}" \
   "${IMAGE}" >/dev/null
 
 echo "WorkStation: local address: https://127.0.0.1:${PORT}"
