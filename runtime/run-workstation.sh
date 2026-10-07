@@ -20,6 +20,9 @@ command -v rsync >/dev/null || die "rsync is required"
 case "${WORKSTATION_OS:-}" in
   Ubuntu-26.04) IMAGE="ghcr.io/selkies-project/selkies/desktop:latest-ubuntu26.04" ;;
   Debian-Trixie) IMAGE="ghcr.io/selkies-project/selkies/desktop:latest-debiantrixie" ;;
+  Windows-10)
+    exec "${ROOT}/runtime/run-windows-vm.sh"
+    ;;
   *) die "unsupported OS: ${WORKSTATION_OS:-}" ;;
 esac
 
