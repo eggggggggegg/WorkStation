@@ -1,0 +1,14 @@
+name: Ubuntu-24.04
+type: container
+image: ghcr.io/selkies-project/selkies/desktop:2.0.0-ubuntu26.04
+
+desktop:
+  window_manager: dwm
+
+persistence:
+  files_path: Pc/Os/Ubuntu-24.04/Files
+  restore_before_start: true
+  save_on_stop: true
+
+resources:
+  gpu: auto
