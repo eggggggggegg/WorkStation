@@ -86,11 +86,25 @@ docker run -d \
 
 ready=0
 for _ in {1..60}; do
-  if ! docker inspect --format "{{.State.Running}}" "${CONTAINER_NAME}" 2>/dev/null | grep -q true; then break; fi
-  if curl -fsS --max-time 2 "http://127.0.0.1:${PORT}/" >/dev/null 2>&1; then ready=1; break; fi
+  if ! docker inspect --format "{{.State.Running}}" "${CONTAINER_NAME}" 2>/dev/null | grep -q true; then
+    break
+  fi
+  # Selkies uses a WebSocket browser endpoint, so "/" is not a reliable
+  # HTTP-200 readiness probe. Verify that its published TCP port is open.
+  if timeout 2 bash -c "</dev/tcp/127.0.0.1/${PORT}" 2>/dev/null; then
+    ready=1
+    break
+  fi
   sleep 2
 done
-(( ready == 1 )) || { docker logs --tail 120 "${CONTAINER_NAME}" >&2 2>/dev/null || true; die "desktop service failed readiness check"; }
+if (( ready != 1 )); then
+  echo "WorkStation: desktop container did not open port ${PORT}." >&2
+  docker port "${CONTAINER_NAME}" >&2 2>/dev/null || true
+  docker inspect --format 'state={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' "${CONTAINER_NAME}" >&2 2>/dev/null || true
+  docker exec "${CONTAINER_NAME}" bash -lc 'ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || true' >&2 2>/dev/null || true
+  docker logs --tail 160 "${CONTAINER_NAME}" >&2 2>/dev/null || true
+  die "desktop service failed readiness check"
+fi
 
 # Restore cached system apps first, then configure GUI launchers from inside
 # the desktop container where the installed applications and X11 environment exist.
