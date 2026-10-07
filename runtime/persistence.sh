@@ -49,7 +49,12 @@ load_os() {
   source="$(safe_files_root "${os}")"
   acquire_lock "${os}"
   mkdir -p "${source}" "${target}"
-  rsync -a --delete --no-owner --no-group --omit-dir-times "${source}/" "${target}/"
+  rsync -a --delete --no-owner --no-group --omit-dir-times \
+    --exclude='.cache/' --exclude='.local/share/Trash/' \
+    --exclude='.config/Code/Cache/' --exclude='.config/Code/CachedData/' --exclude='.config/Code/logs/' \
+    --exclude='.npm/' --exclude='.cargo/registry/' --exclude='.cargo/git/' --exclude='.rustup/' \
+    --exclude='.config/workstation/runtime/' \
+    "${source}/" "${target}/"
 }
 
 reject_persisted_secrets() {
@@ -74,7 +79,12 @@ save_os() {
   acquire_lock "${os}"
   mkdir -p "${destination}"
   reject_persisted_secrets "${source}"
-  rsync -a --delete --exclude='.git/' "${source}/" "${destination}/"
+  rsync -a --delete --exclude='.git/' \
+    --exclude='.cache/' --exclude='.local/share/Trash/' \
+    --exclude='.config/Code/Cache/' --exclude='.config/Code/CachedData/' --exclude='.config/Code/logs/' \
+    --exclude='.npm/' --exclude='.cargo/registry/' --exclude='.cargo/git/' --exclude='.rustup/' \
+    --exclude='.config/workstation/runtime/' \
+    "${source}/" "${destination}/"
 
   local relative="${destination#${ROOT}/}"
   git -C "${ROOT}" add -- "${relative}"
