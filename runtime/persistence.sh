@@ -15,6 +15,12 @@ valid_os_name() {
   [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
 }
 
+safe_os_root() {
+  local os="$1"
+  valid_os_name "$os" || { echo "invalid OS name" >&2; exit 2; }
+  printf "%s\n" "${OS_ROOT}/${os}"
+}
+
 safe_files_root() {
   local os="$1"
   valid_os_name "${os}" || { echo "invalid OS name" >&2; exit 2; }
