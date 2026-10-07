@@ -50,9 +50,6 @@ trap cleanup EXIT INT TERM
 echo "WorkStation: restoring ${WORKSTATION_OS}..."
 "${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
 
-# Repair common desktop-app launchers after persistence restore. This keeps
-# Electron apps such as VS Code compatible with the X11/Selkies desktop.
-"${ROOT}/runtime/configure-desktop-apps.sh" "${HOME_ROOT}" || echo "WorkStation: desktop app configuration warning" >&2
 
 mkdir -p "${HOME_ROOT}/.config/workstation"
 cat > "${HOME_ROOT}/.config/workstation/profile.yaml" <<EOF
@@ -69,6 +66,7 @@ docker run -d \
   --shm-size=2g \
   -p "127.0.0.1:${PORT}:8080" \
   -v "${HOME_ROOT}:/home/ubuntu" \
+  -v "${ROOT}/runtime:/opt/workstation:ro" \
   -e "PASSWD=${WORKSTATION_PASSWORD}" \
   -e "SELKIES_BASIC_AUTH_USER=ubuntu" \
   -e "SELKIES_BASIC_AUTH_PASSWORD=${WORKSTATION_PASSWORD}" \
@@ -76,6 +74,10 @@ docker run -d \
   -e "SELKIES_ENABLE_HTTPS=false" \
   "${GPU_ARGS[@]}" \
   "${IMAGE}" >/dev/null
+
+# Configure GUI app launchers from inside the desktop container, where the
+# installed applications and X11 environment actually exist.
+docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/configure-desktop-apps.sh /home/ubuntu || echo "WorkStation: desktop app configuration warning" >&2
 
 echo "WorkStation: local address: http://127.0.0.1:${PORT}"
 
