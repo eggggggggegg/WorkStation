@@ -39,7 +39,7 @@ else
     if curl -fsSL --retry 3 --retry-delay 2 \
         -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36' \
         "${DOWNLOAD_PAGE}" -o "${page}"; then
-      url="\$(grep -Eo 'https://software\.download\.prss\.microsoft\.com/dbazure/Win10_22H2_English_x64v1\.iso[^"<> ]*' "${page}" | head -n1 || true)"
+      url="$(grep -Eo 'https://software\.download\.prss\.microsoft\.com/dbazure/Win10_22H2_English_x64v1\.iso[^"<> ]*' "${page}" | head -n1 || true)"
     fi
   fi
 
