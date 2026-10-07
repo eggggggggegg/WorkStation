@@ -50,6 +50,10 @@ trap cleanup EXIT INT TERM
 echo "WorkStation: restoring ${WORKSTATION_OS}..."
 "${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
 
+# Repair common desktop-app launchers after persistence restore. This keeps
+# Electron apps such as VS Code compatible with the X11/Selkies desktop.
+"${ROOT}/runtime/configure-desktop-apps.sh" "${HOME_ROOT}" || echo "WorkStation: desktop app configuration warning" >&2
+
 mkdir -p "${HOME_ROOT}/.config/workstation"
 cat > "${HOME_ROOT}/.config/workstation/profile.yaml" <<EOF
 name: "${WORKSTATION_NAME}"
