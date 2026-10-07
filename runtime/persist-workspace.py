@@ -158,6 +158,14 @@ def save(source: Path, store: Path) -> None:
             digest, size = sha256_file(path)
             key = hashlib.sha256(rel.encode("utf-8")).hexdigest()[:32]
             chunk_dir = store / key
+            # A previous version of persistence may have copied this large
+            # file directly. Remove that oversized destination before Git
+            # staging; the chunk store becomes the canonical representation.
+            destination_file = store.parent / rel
+            if destination_file.is_file() or destination_file.is_symlink():
+                destination_file.unlink()
+            elif destination_file.exists():
+                shutil.rmtree(destination_file)
             previous = old_files.get(rel)
             chunks = previous.get("chunks", []) if isinstance(previous, dict) else []
 
