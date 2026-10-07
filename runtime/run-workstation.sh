@@ -67,10 +67,11 @@ docker run -d \
   -e "SELKIES_BASIC_AUTH_USER=ubuntu" \
   -e "SELKIES_BASIC_AUTH_PASSWORD=${WORKSTATION_PASSWORD}" \
   -e "SELKIES_MODE=webrtc" \
+  -e "SELKIES_ENABLE_HTTPS=false" \
   "${GPU_ARGS[@]}" \
   "${IMAGE}" >/dev/null
 
-echo "WorkStation: local address: https://127.0.0.1:${PORT}"
+echo "WorkStation: local address: http://127.0.0.1:${PORT}"
 
 if command -v cloudflared >/dev/null 2>&1; then
   echo "WorkStation: starting temporary Cloudflare Quick Tunnel..."
