@@ -49,7 +49,7 @@ load_os() {
   source="$(safe_files_root "${os}")"
   acquire_lock "${os}"
   mkdir -p "${source}" "${target}"
-  rsync -a --delete --no-owner --no-group "${source}/" "${target}/"
+  rsync -a --delete --no-owner --no-group --omit-dir-times "${source}/" "${target}/"
 }
 
 reject_persisted_secrets() {
