@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-RUNTIME_ROOT="${WORKSTATION_RUNTIME_ROOT:-/var/lib/workstation}"
+RUNTIME_ROOT="${WORKSTATION_RUNTIME_ROOT:-${RUNNER_TEMP:-${ROOT}/.runtime}/workstation}"
 SESSION_ROOT="${RUNTIME_ROOT}/sessions/${WORKSTATION_NAME}"
 HOME_ROOT="${SESSION_ROOT}/home"
 LOG_ROOT="${SESSION_ROOT}/logs"
