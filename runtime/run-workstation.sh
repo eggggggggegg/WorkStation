@@ -82,8 +82,11 @@ echo "WorkStation: restoring ${WORKSTATION_OS}..."
 "${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
 
 
-mkdir -p "${HOME_ROOT}/.config/workstation"
-cat > "${HOME_ROOT}/.config/workstation/profile.yaml" <<EOF
+# The restore runs with elevated permissions so it can replace container-owned files.
+# Write the generated workstation profile the same way, then hand the home back to
+# the desktop user before starting Docker.
+sudo mkdir -p "${HOME_ROOT}/.config/workstation"
+sudo tee "${HOME_ROOT}/.config/workstation/profile.yaml" >/dev/null <<EOF
 name: "${WORKSTATION_NAME}"
 profile: default
 EOF
