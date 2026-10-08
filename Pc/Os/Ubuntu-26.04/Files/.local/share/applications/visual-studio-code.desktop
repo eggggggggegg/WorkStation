@@ -2,7 +2,7 @@
 Name=Visual Studio Code
 Comment=Code editor
 Exec=/home/ubuntu/.local/bin/workstation-code %U
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Development;IDE;
 StartupNotify=true
