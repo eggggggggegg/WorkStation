@@ -32,12 +32,13 @@ jobs:
           ref: ${{ inputs.persistent_ref }}
           fetch-depth: 1
 
-      - name: Install Docker
+      - name: Prepare runner
         shell: bash
         run: |
           set -euo pipefail
+          command -v docker >/dev/null || { echo "Docker is not available on the GitHub runner"; exit 1; }
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends docker.io curl rsync
+          sudo apt-get install -y --no-install-recommends curl rsync openssl
 
       - name: Build workstation image
         shell: bash
@@ -76,14 +77,7 @@ jobs:
           SELKIES_BASIC_AUTH_PASSWORD: ${{ steps.credentials.outputs.password }}
         run: |
           set -euo pipefail
-          docker run -d --name workstation \
-            --shm-size=2g \
-            -e SELKIES_BASIC_AUTH_USER=workstation \
-            -e SELKIES_BASIC_AUTH_PASSWORD="$SELKIES_BASIC_AUTH_PASSWORD" \
-            -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation" \
-            -v "$GITHUB_WORKSPACE/runtime/system:/persistent-system:ro" \
-            -p 127.0.0.1:8080:8080 \
-            workstation:local
+          docker run -d --name workstation             --shm-size=2g             -e SELKIES_BASIC_AUTH_USER=workstation             -e SELKIES_BASIC_AUTH_PASSWORD="$SELKIES_BASIC_AUTH_PASSWORD"             -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation"             -v "$GITHUB_WORKSPACE/runtime/system:/persistent-system:ro"             -p 127.0.0.1:8080:8080             workstation:local
 
           for i in $(seq 1 300); do
             if curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
@@ -100,8 +94,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
-            -o /tmp/cloudflared
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64             -o /tmp/cloudflared
           sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared
           nohup cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080 > /tmp/cloudflared.log 2>&1 &
 
