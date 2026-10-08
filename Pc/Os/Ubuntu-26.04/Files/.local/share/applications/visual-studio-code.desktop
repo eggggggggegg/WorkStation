@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Visual Studio Code
+Comment=Code editor
+Exec=/home/ubuntu/.local/bin/workstation-code %U
+Terminal=false
+Type=Application
+Categories=Development;IDE;
+StartupNotify=true

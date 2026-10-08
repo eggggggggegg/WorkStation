@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export ELECTRON_OZONE_PLATFORM_HINT=x11
+exec "${CODE_BIN}" --disable-gpu "$@"
