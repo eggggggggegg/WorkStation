@@ -86,6 +86,9 @@ exec /opt/selkies/bin/selkies \
   --basic-auth-user="${SELKIES_BASIC_AUTH_USER:-workstation}" \
   --basic-auth-password="${SELKIES_BASIC_AUTH_PASSWORD:?SELKIES_BASIC_AUTH_PASSWORD is required}" \
   --enable-resize=true \
+  --ui-show-sidebar=true \
+  --ui-sidebar-show-fullscreen=true \
+  --ui-sidebar-show-gaming-mode=true \
   --encoder=jpeg \
   --use-cpu=true \
   2> >(tee -a /tmp/selkies.log >&2)
