@@ -1,0 +1,104 @@
+name: WorkStation
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloudflare_tunnel_token:
+        description: "Cloudflare Tunnel token (optional; stored only for this run)"
+        required: false
+        type: string
+      persistent_ref:
+        description: "Git ref containing persistent-data/"
+        required: false
+        default: "main"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: workstation
+  cancel-in-progress: false
+
+jobs:
+  workstation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.persistent_ref }}
+          fetch-depth: 1
+
+      - name: Prepare persistent storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p persistent-data
+          mkdir -p runtime/home
+          if [ -d persistent-data/home ]; then
+            cp -a persistent-data/home/. runtime/home/
+          fi
+
+      - name: Install host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl git jq unzip \
+            docker.io docker-compose-plugin \
+            x11vnc xvfb fluxbox \
+            dbus-x11 xauth
+
+      - name: Build workstation container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -t workstation:local .
+
+      - name: Start workstation
+        shell: bash
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ inputs.cloudflare_tunnel_token }}
+        run: |
+          set -euo pipefail
+          docker run -d --name workstation \
+            --shm-size=2g \
+            -e HOME=/home/workstation \
+            -e USER=workstation \
+            -e CLOUDFLARE_TUNNEL_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN}" \
+            -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation" \
+            workstation:local
+
+      - name: Keep workstation alive
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 21000); do
+            if ! docker ps --format '{{.Names}}' | grep -qx workstation; then
+              docker logs workstation || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Save persistent home
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p persistent-data/home
+          if docker ps -a --format '{{.Names}}' | grep -qx workstation; then
+            docker cp workstation:/home/workstation/. persistent-data/home/ || true
+          fi
+          rm -rf persistent-data/home/.cache persistent-data/home/.local/share/Trash
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add persistent-data/
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: persist workstation home"
+            git push
+          fi
