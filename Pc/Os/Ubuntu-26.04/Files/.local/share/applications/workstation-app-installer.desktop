@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=WorkStation App Installer
-Comment=Install Linux applications and packages
-Exec=/home/ubuntu/.local/bin/workstation-app-installer
-Terminal=true
-Type=Application
-Categories=System;PackageManager;Utility;
-StartupNotify=true
