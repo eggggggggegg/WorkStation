@@ -10,3 +10,6 @@ what this should be able to due
 
 
 using github actions as the backend it should download and run linux mint (the newest version) and allow downloading and playing apps, using browsers, saving files (save any files/folders/zips to the github repo in a special folder that it reads from on launch and reputs it all in the next run for persistant storage) etc etc. I want everything working study it all carefully and lock in
+
+
+it should use selkies, dwm, cloudflared and github actions to run this all.
