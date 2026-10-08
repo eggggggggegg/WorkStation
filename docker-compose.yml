@@ -1,0 +1,12 @@
+services:
+  workstation:
+    build: .
+    shm_size: 2gb
+    environment:
+      HOME: /home/workstation
+      USER: workstation
+      CLOUDFLARE_TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    ports:
+      - "5900:5900"
+    volumes:
+      - ./persistent-data/home:/home/workstation
