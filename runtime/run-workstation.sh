@@ -130,6 +130,14 @@ if (( ready != 1 )); then
   die "desktop service failed readiness check"
 fi
 
+# Re-apply persisted home after the desktop container has initialized. This prevents
+# the image's first-run setup from overwriting restored files/settings.
+echo "WorkStation: re-applying persisted home after desktop startup..."
+"${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
+sudo chown -R 1000:1000 "${HOME_ROOT}"
+RESTORED_FILES="$($(find "${HOME_ROOT}" -type f 2>/dev/null | wc -l | tr -d ' ')"
+echo "WorkStation: restored ${RESTORED_FILES} files into /home/ubuntu."
+
 # Restore cached system apps first, then configure GUI launchers from inside
 # the desktop container where the installed applications and X11 environment exist.
 for _ in {1..10}; do docker exec "${CONTAINER_NAME}" /bin/bash /opt/workstation/provision-apps.sh && break; sleep 2; done || echo "WorkStation: app restore warning" >&2
