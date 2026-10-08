@@ -32,7 +32,7 @@ restore_appcenter() {
   fi
 }
 
-if [[ -f "${CACHE_ROOT}/vscode.deb" && ! -x /usr/bin/code ]]; then
+if [[ -f "${CACHE_ROOT}/vscode.deb" && ! -x /usr/bin/code && ! -x /usr/bin/code-insiders ]]; then
   echo "WorkStation: restoring cached VS Code installation..."
   if command -v sudo >/dev/null 2>&1; then
     sudo apt-get update
@@ -42,7 +42,20 @@ if [[ -f "${CACHE_ROOT}/vscode.deb" && ! -x /usr/bin/code ]]; then
   fi
 fi
 
-if [[ -x /usr/bin/code ]]; then
+if [[ -x /usr/bin/code || -x /usr/bin/code-insiders ]]; then
+  repair_vscode_sandbox
+fi
+
+if [[ ! -x /usr/bin/code && ! -x /usr/bin/code-insiders ]]; then
+  echo "WorkStation: VS Code is not installed; installing the current stable build..."
+  if /opt/workstation/app-installer.sh vscode; then
+    echo "WorkStation: VS Code installed."
+  else
+    echo "WorkStation: VS Code installation failed; continuing without it." >&2
+  fi
+fi
+
+if [[ -x /usr/bin/code || -x /usr/bin/code-insiders ]]; then
   repair_vscode_sandbox
 fi
 
