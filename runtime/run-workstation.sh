@@ -137,10 +137,9 @@ fi
 # may create root-owned config directories during first-run setup, so normalize
 # ownership before rsync writes the persisted files back in.
 echo "WorkStation: re-applying persisted home after desktop startup..."
-sudo chown -R "$(id -u):$(id -g)" "${HOME_ROOT}" >/dev/null 2>&1 || true
+sudo chown -R 1000:1000 "${HOME_ROOT}" >/dev/null 2>&1 || true
 "${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
-sudo chown -R 1000:1000 "${HOME_ROOT}"
-RESTORED_FILES="$(find "${HOME_ROOT}" -type f 2>/dev/null | wc -l | tr -d ' ')"
+# The mounted desktop home must remain writable by the Ubuntu desktop user.\n# This is required for browser downloads, per-user applications, and installers.\nsudo chown -R 1000:1000 "${HOME_ROOT}" >/dev/null 2>&1 || true\nsudo chmod u+rwx "${HOME_ROOT}" >/dev/null 2>&1 || true\nsudo mkdir -p "${HOME_ROOT}/Downloads" "${HOME_ROOT}/.local" "${HOME_ROOT}/.config" >/dev/null 2>&1 || true\nsudo chown 1000:1000 "${HOME_ROOT}/Downloads" "${HOME_ROOT}/.local" "${HOME_ROOT}/.config" >/dev/null 2>&1 || true\nRESTORED_FILES="$(find "${HOME_ROOT}" -type f 2>/dev/null | wc -l | tr -d ' ')"
 echo "WorkStation: restored ${RESTORED_FILES} files into /home/ubuntu."
 
 # Restore cached system apps first, then configure GUI launchers from inside
