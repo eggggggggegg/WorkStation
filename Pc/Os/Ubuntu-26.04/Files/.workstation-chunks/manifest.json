@@ -1,19 +1,5 @@
 {
   "chunk_size": 47185920,
-  "files": {
-    "cache/workstation/apps/vscode.deb": {
-      "chunks": [
-        "part-000001",
-        "part-000002",
-        "part-000003",
-        "part-000004",
-        "part-000005",
-        "part-000006"
-      ],
-      "mode": 420,
-      "sha256": "d0ff4f7702957d897d2e06956f8d42a08250c5df8339de3bec8190e56f726277",
-      "size": 249220234
-    }
-  },
+  "files": {},
   "format": 1
 }
