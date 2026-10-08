@@ -84,3 +84,16 @@ jobs:
         run: |
           chmod +x runtime/run-workstation.sh runtime/persistence.sh runtime/*.sh
           runtime/run-workstation.sh
+
+      # A canceled long-running step can be terminated before its shell trap
+      # finishes. This cleanup step runs even when the workstation step is
+      # canceled and commits whatever is left in the mounted home directory.
+      - name: Persist workstation after session
+        if: ${{ always() }}
+        run: |
+          chmod +x runtime/persistence.sh
+          if [ -d "${RUNNER_TEMP}/workstation/sessions/${WORKSTATION_NAME}/home" ]; then
+            runtime/persistence.sh save "${WORKSTATION_OS}" "${RUNNER_TEMP}/workstation/sessions/${WORKSTATION_NAME}/home"
+          else
+            echo "WorkStation: no session home directory found; nothing to persist."
+          fi
