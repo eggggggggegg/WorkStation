@@ -130,12 +130,14 @@ if (( ready != 1 )); then
   die "desktop service failed readiness check"
 fi
 
-# Re-apply persisted home after the desktop container has initialized. This prevents
-# the image's first-run setup from overwriting restored files/settings.
+# Re-apply persisted home after the desktop container has initialized. The container
+# may create root-owned config directories during first-run setup, so normalize
+# ownership before rsync writes the persisted files back in.
 echo "WorkStation: re-applying persisted home after desktop startup..."
+sudo chown -R "$(id -u):$(id -g)" "${HOME_ROOT}" >/dev/null 2>&1 || true
 "${ROOT}/runtime/persistence.sh" load "${WORKSTATION_OS}" "${HOME_ROOT}"
 sudo chown -R 1000:1000 "${HOME_ROOT}"
-RESTORED_FILES="$($(find "${HOME_ROOT}" -type f 2>/dev/null | wc -l | tr -d ' ')"
+RESTORED_FILES="$(find "${HOME_ROOT}" -type f 2>/dev/null | wc -l | tr -d ' ')"
 echo "WorkStation: restored ${RESTORED_FILES} files into /home/ubuntu."
 
 # Restore cached system apps first, then configure GUI launchers from inside
