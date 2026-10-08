@@ -43,7 +43,20 @@ done
 xset -display "$DISPLAY" s off || true
 xset -display "$DISPLAY" -dpms || true
 
-dwm >/tmp/dwm.log 2>&1 &
+# Start a real Linux Mint Cinnamon session on the virtual display. Mint's
+# Cinnamon desktop provides the panels, menu, file manager, settings, terminal,
+# window manager, and normal desktop behavior instead of an empty X server.
+pulseaudio --start --daemonize=true --exit-idle-time=-1 >/tmp/pulseaudio.log 2>&1 || true
+export PULSE_SERVER=unix:${XDG_RUNTIME_DIR}/pulse/native
+
+if command -v dbus-launch >/dev/null 2>&1 && command -v cinnamon-session >/dev/null 2>&1; then
+  dbus-launch --exit-with-session cinnamon-session >/tmp/cinnamon.log 2>&1 &
+  DESKTOP_PID=$!
+else
+  echo "Cinnamon session could not be started; falling back to a minimal window manager."
+  dwm >/tmp/dwm.log 2>&1 &
+  DESKTOP_PID=$!
+fi
 
 echo "========== WORKSTATION STREAM DIAGNOSTICS =========="
 echo "DISPLAY=$DISPLAY"
@@ -55,6 +68,10 @@ echo "--- pcmflux import ---"
 /opt/selkies/bin/python -c 'import pcmflux; print("pcmflux OK:", pcmflux.__file__)' 2>&1 || true
 echo "--- Xvfb ---"
 cat /tmp/Xvfb.log 2>/dev/null || true
+echo "--- Cinnamon ---"
+cat /tmp/cinnamon.log 2>/dev/null || true
+echo "--- PulseAudio ---"
+cat /tmp/pulseaudio.log 2>/dev/null || true
 echo "--- X11 ---"
 xdpyinfo -display "$DISPLAY" 2>&1 | head -n 40 || true
 echo "===================================================="
@@ -70,4 +87,5 @@ exec /opt/selkies/bin/selkies \
   --basic-auth-password="${SELKIES_BASIC_AUTH_PASSWORD:?SELKIES_BASIC_AUTH_PASSWORD is required}" \
   --enable-resize=true \
   --encoder=jpeg \
+  --use-cpu=true \
   2> >(tee -a /tmp/selkies.log >&2)
