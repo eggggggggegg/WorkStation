@@ -42,15 +42,39 @@ elif [[ -d /dev/dri ]]; then
   fi
 fi
 
+AUTOSAVE_PID=""
+
+save_now() {
+  set +e
+  sudo chown -R "$(id -u):$(id -g)" "${HOME_ROOT}" >/dev/null 2>&1 || true
+  "${ROOT}/runtime/persistence.sh" save "${WORKSTATION_OS}" "${HOME_ROOT}" || echo "WorkStation: persistence save failed" >&2
+}
+
+start_autosave() {
+  (
+    trap 'exit 0' INT TERM EXIT
+    while true; do
+      sleep "${WORKSTATION_AUTOSAVE_SECONDS:-60}" || exit 0
+      echo "WorkStation: autosaving workspace..."
+      save_now
+    done
+  ) &
+  AUTOSAVE_PID=$!
+}
+
 cleanup() {
   set +e
+  # Persist before teardown because canceled GitHub steps have a short grace period.
+  if [[ -n "${AUTOSAVE_PID:-}" ]]; then
+    kill "${AUTOSAVE_PID}" >/dev/null 2>&1 || true
+    wait "${AUTOSAVE_PID}" >/dev/null 2>&1 || true
+  fi
+  save_now
   docker stop -t 20 "${CONTAINER_NAME}" >/dev/null 2>&1 || true
   if [[ -n "${TUNNEL_PID:-}" ]]; then
     kill "${TUNNEL_PID}" >/dev/null 2>&1 || true
     wait "${TUNNEL_PID}" >/dev/null 2>&1 || true
   fi
-  sudo chown -R "$(id -u):$(id -g)" "${HOME_ROOT}" >/dev/null 2>&1 || true
-  "${ROOT}/runtime/persistence.sh" save "${WORKSTATION_OS}" "${HOME_ROOT}" || echo "WorkStation: persistence save failed" >&2
 }
 trap cleanup EXIT INT TERM
 
@@ -134,4 +158,8 @@ fi
 
 echo "WorkStation: running. Keep this workflow active while using the desktop."
 echo "WorkStation: password is intentionally not printed."
+echo "WorkStation: automatic persistence is enabled (${WORKSTATION_AUTOSAVE_SECONDS:-60}s interval)."
+
+# Periodic saves protect work even when GitHub cancels the long-running step.
+start_autosave
 docker wait "${CONTAINER_NAME}" >/dev/null
