@@ -1,0 +1,29 @@
+# GitHub Actions / build output
+*.log
+*.tmp
+*.cache
+.cache/
+dist/
+build/
+out/
+
+# VM / disk images
+*.qcow2
+*.qcow2c
+*.vdi
+*.vmdk
+*.img
+*.iso
+
+# Runtime state / credentials
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/
+runtime/
+state/
+
+# Persistent user data is intentionally kept separately.
+# Put user files under persistent-data/ only.
