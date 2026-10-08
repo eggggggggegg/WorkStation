@@ -43,13 +43,16 @@ jobs:
         shell: bash
         run: docker build --pull -t workstation:local .
 
-      - name: Restore persistent home
+      - name: Restore persistent storage
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p runtime/home
+          mkdir -p runtime/home runtime/system
           if [ -d persistent-data/home ]; then
             rsync -a --delete persistent-data/home/ runtime/home/
+          fi
+          if [ -d persistent-data/system ]; then
+            rsync -a persistent-data/system/ runtime/system/
           fi
 
       - name: Create session credentials
@@ -78,14 +81,15 @@ jobs:
             -e SELKIES_BASIC_AUTH_USER=workstation \
             -e SELKIES_BASIC_AUTH_PASSWORD="$SELKIES_BASIC_AUTH_PASSWORD" \
             -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation" \
+            -v "$GITHUB_WORKSPACE/runtime/system:/persistent-system:ro" \
             -p 127.0.0.1:8080:8080 \
             workstation:local
 
-          for i in $(seq 1 120); do
+          for i in $(seq 1 300); do
             if curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
               break
             fi
-            if [ "$i" = 120 ]; then
+            if [ "$i" = 300 ]; then
               docker logs workstation
               exit 1
             fi
@@ -99,24 +103,16 @@ jobs:
           curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
             -o /tmp/cloudflared
           sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared
-
-          nohup cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080 \
-            > /tmp/cloudflared.log 2>&1 &
-          echo $! > /tmp/cloudflared.pid
+          nohup cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080 > /tmp/cloudflared.log 2>&1 &
 
           URL=""
           for i in $(seq 1 60); do
             URL="$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n1 || true)"
-            if [ -n "$URL" ]; then
-              break
-            fi
+            [ -n "$URL" ] && break
             sleep 1
           done
 
-          if [ -z "$URL" ]; then
-            cat /tmp/cloudflared.log
-            exit 1
-          fi
+          [ -n "$URL" ] || { cat /tmp/cloudflared.log; exit 1; }
 
           {
             echo "## WorkStation is live"
@@ -148,10 +144,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p persistent-data/system
-          docker exec workstation bash -lc 'dpkg-query -W -f="${binary:Package}\n" 2>/dev/null | sort -u' \
-            > persistent-data/system/dpkg-packages.txt || true
-          docker exec workstation bash -lc 'command -v flatpak >/dev/null && flatpak list --app --columns=application 2>/dev/null | sort -u || true' \
-            > persistent-data/system/flatpak-apps.txt || true
+          docker exec workstation bash -lc 'apt-mark showmanual 2>/dev/null | sort -u' > persistent-data/system/apt-manual-packages.txt || true
+          docker exec workstation bash -lc 'command -v flatpak >/dev/null && flatpak list --app --columns=application 2>/dev/null | sort -u || true' > persistent-data/system/flatpak-apps.txt || true
 
       - name: Save complete persistent home
         if: always()
