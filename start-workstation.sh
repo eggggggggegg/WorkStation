@@ -45,8 +45,22 @@ xset -display "$DISPLAY" -dpms || true
 
 dwm >/tmp/dwm.log 2>&1 &
 
-# Use WebSockets explicitly and force the maximum-compatibility JPEG encoder.
-# This avoids depending on VA-API/GPU H.264 support on the GitHub runner.
+echo "========== WORKSTATION STREAM DIAGNOSTICS =========="
+echo "DISPLAY=$DISPLAY"
+echo "--- libva ---"
+ldconfig -p 2>/dev/null | grep -E 'libva|libva-drm' || true
+echo "--- pixelflux import ---"
+/opt/selkies/bin/python -c 'import pixelflux; print("pixelflux OK:", pixelflux.__file__)' 2>&1 || true
+echo "--- pcmflux import ---"
+/opt/selkies/bin/python -c 'import pcmflux; print("pcmflux OK:", pcmflux.__file__)' 2>&1 || true
+echo "--- Xvfb ---"
+cat /tmp/Xvfb.log 2>/dev/null || true
+echo "--- X11 ---"
+xdpyinfo -display "$DISPLAY" 2>&1 | head -n 40 || true
+echo "===================================================="
+
+# Keep Selkies logs in both the Actions/container log and a file that can be
+# inspected after a failed session.
 exec /opt/selkies/bin/selkies \
   --public \
   --port=8080 \
@@ -55,4 +69,5 @@ exec /opt/selkies/bin/selkies \
   --basic-auth-user="${SELKIES_BASIC_AUTH_USER:-workstation}" \
   --basic-auth-password="${SELKIES_BASIC_AUTH_PASSWORD:?SELKIES_BASIC_AUTH_PASSWORD is required}" \
   --enable-resize=true \
-  --encoder=jpeg
+  --encoder=jpeg \
+  2> >(tee -a /tmp/selkies.log >&2)
