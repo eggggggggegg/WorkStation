@@ -22,7 +22,13 @@ if command -v flatpak >/dev/null 2>&1 && [ -s /persistent-system/flatpak-apps.tx
   done < /persistent-system/flatpak-apps.txt
 fi
 
-Xvfb "$DISPLAY" -screen 0 1920x1080x24 -ac +extension GLX +render -noreset >/tmp/Xvfb.log 2>&1 &
+# A complete X11 framebuffer with the extensions Selkies expects.
+Xvfb "$DISPLAY" \
+  -screen 0 1920x1080x24 \
+  -s 0 -dpms \
+  +extension COMPOSITE +extension DAMAGE +extension GLX +extension RANDR \
+  +extension RENDER +extension MIT-SHM +extension XFIXES +extension XTEST \
+  +iglx +render -nolisten tcp -ac -noreset -shmem >/tmp/Xvfb.log 2>&1 &
 XVFB_PID=$!
 
 cleanup() {
@@ -39,11 +45,14 @@ xset -display "$DISPLAY" -dpms || true
 
 dwm >/tmp/dwm.log 2>&1 &
 
+# Use WebSockets explicitly and force the maximum-compatibility JPEG encoder.
+# This avoids depending on VA-API/GPU H.264 support on the GitHub runner.
 exec /opt/selkies/bin/selkies \
   --public \
   --port=8080 \
+  --mode=websockets \
   --enable-https=false \
   --basic-auth-user="${SELKIES_BASIC_AUTH_USER:-workstation}" \
   --basic-auth-password="${SELKIES_BASIC_AUTH_PASSWORD:?SELKIES_BASIC_AUTH_PASSWORD is required}" \
   --enable-resize=true \
-  --encoder=h264enc
+  --encoder=jpeg
