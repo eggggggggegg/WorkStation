@@ -23,12 +23,12 @@ restore_appcenter() {
     fi
     return 0
   fi
+  # Always install GNOME Software as the reliable GUI package center.
+  sudo apt-get update
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y gnome-software || true
+  # Keep Snap Store available when snapd works, but do not make startup depend on it.
   if ! snap list snap-store >/dev/null 2>&1; then
-    sudo snap install snap-store || {
-      echo "WorkStation: App Center snap failed; installing GNOME Software fallback." >&2
-      sudo apt-get update || true
-      sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y gnome-software || true
-    }
+    sudo snap install snap-store || true
   fi
 }
 
