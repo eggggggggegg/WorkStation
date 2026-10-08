@@ -46,9 +46,11 @@ load_os() {
   source="$(safe_files_root "${os}")"
   acquire_lock "${os}"
   mkdir -p "${source}" "${target}"
-  rsync -a --delete --no-owner --no-group --omit-dir-times "${RSYNC_EXCLUDES[@]}" "${source}/" "${target}/"
+  # The desktop container can create root-owned files in the mounted home.
+  # Run the restore as root so rsync can replace/delete those files reliably.
+  sudo rsync -a --delete --no-owner --no-group --omit-dir-times "${RSYNC_EXCLUDES[@]}" "${source}/" "${target}/"
   command -v python3 >/dev/null 2>&1 || { echo "WorkStation: python3 is required for large-file restore" >&2; exit 1; }
-  python3 "${ROOT}/runtime/persist-workspace.py" load "${target}" "${source}"
+  sudo python3 "${ROOT}/runtime/persist-workspace.py" load "${target}" "${source}"
 }
 
 save_os() {
@@ -57,9 +59,11 @@ save_os() {
   [[ -d "${source}" ]] || { echo "source does not exist: ${source}" >&2; exit 1; }
   acquire_lock "${os}"
   mkdir -p "${destination}"
-  rsync -a --delete "${RSYNC_EXCLUDES[@]}" "${source}/" "${destination}/"
+  # The container may leave root-owned files behind; use root for the snapshot
+  # so saves cannot fail merely because the desktop changed ownership.
+  sudo rsync -a --delete "${RSYNC_EXCLUDES[@]}" "${source}/" "${destination}/"
   command -v python3 >/dev/null 2>&1 || { echo "WorkStation: python3 is required for large-file persistence" >&2; exit 1; }
-  python3 "${ROOT}/runtime/persist-workspace.py" save "${source}" "${destination}/.workstation-chunks"
+  sudo python3 "${ROOT}/runtime/persist-workspace.py" save "${source}" "${destination}/.workstation-chunks"
   relative="${destination#${ROOT}/}"
   git -C "${ROOT}" add -- "${relative}"
   if git -C "${ROOT}" diff --cached --quiet -- "${relative}"; then
