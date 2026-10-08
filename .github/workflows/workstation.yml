@@ -59,12 +59,10 @@ jobs:
       - name: Create session credentials
         id: credentials
         shell: bash
-        env:
-          INPUT_PASSWORD: ${{ inputs.desktop_password }}
         run: |
           set -euo pipefail
-          if [ -n "$INPUT_PASSWORD" ]; then
-            PASSWORD="$INPUT_PASSWORD"
+          if [ -n "${{ inputs.desktop_password }}" ]; then
+            PASSWORD="${{ inputs.desktop_password }}"
           else
             PASSWORD="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)"
           fi
@@ -80,10 +78,12 @@ jobs:
           docker run -d --name workstation             --shm-size=2g             -e SELKIES_BASIC_AUTH_USER=workstation             -e SELKIES_BASIC_AUTH_PASSWORD="$SELKIES_BASIC_AUTH_PASSWORD"             -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation"             -v "$GITHUB_WORKSPACE/runtime/system:/persistent-system:ro"             -p 127.0.0.1:8080:8080             workstation:local
 
           for i in $(seq 1 300); do
-            if curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
+            if curl -fsS -u "workstation:$SELKIES_BASIC_AUTH_PASSWORD"                 http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              echo "Selkies is ready."
               break
             fi
             if [ "$i" = 300 ]; then
+              echo "Selkies did not become ready."
               docker logs workstation
               exit 1
             fi
