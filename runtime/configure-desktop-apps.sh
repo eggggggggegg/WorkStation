@@ -14,7 +14,7 @@ if [[ -x /usr/bin/code || -x /usr/bin/code-insiders ]]; then
 #!/usr/bin/env bash
 set -Eeuo pipefail
 export ELECTRON_OZONE_PLATFORM_HINT=x11
-exec /usr/bin/code --disable-gpu "$@"
+exec "${CODE_BIN}" --disable-gpu "$@"
 EOF
   chmod +x "${BIN_DIR}/workstation-code"
 
@@ -35,6 +35,7 @@ EOF
     printf '%s\n' '{' '  "terminal.integrated.gpuAcceleration": "off",' '  "window.titleBarStyle": "native"' '}' > "${SETTINGS}"
   fi
 
+  chown -R "$(id -u):$(id -g)" "${DESKTOP_DIR}" "${BIN_DIR}" "${HOME_ROOT}/.config/Code" 2>/dev/null || true
   echo "WorkStation: configured VS Code for X11/software rendering."
 fi
 
