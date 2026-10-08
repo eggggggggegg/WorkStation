@@ -1,2 +1,3 @@
-2026/10/08-00:13:50.074 44f Creating DB /home/ubuntu/.config/google-chrome/Default/Extension Rules since it was missing.
-2026/10/08-00:13:50.076 44f Reusing MANIFEST /home/ubuntu/.config/google-chrome/Default/Extension Rules/MANIFEST-000001
+2026/10/08-00:44:59.222 436 Reusing MANIFEST /home/ubuntu/.config/google-chrome/Default/Extension Rules/MANIFEST-000001
+2026/10/08-00:44:59.223 436 Recovering log #3
+2026/10/08-00:44:59.223 436 Reusing old log /home/ubuntu/.config/google-chrome/Default/Extension Rules/000003.log 

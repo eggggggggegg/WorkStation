@@ -1,2 +1,3 @@
-2026/10/08-00:13:50.064 413 Creating DB /home/ubuntu/.config/google-chrome/Default/Site Characteristics Database since it was missing.
-2026/10/08-00:13:50.066 413 Reusing MANIFEST /home/ubuntu/.config/google-chrome/Default/Site Characteristics Database/MANIFEST-000001
+2026/10/08-00:44:59.214 46e Reusing MANIFEST /home/ubuntu/.config/google-chrome/Default/Site Characteristics Database/MANIFEST-000001
+2026/10/08-00:44:59.214 46e Recovering log #3
+2026/10/08-00:44:59.215 46e Reusing old log /home/ubuntu/.config/google-chrome/Default/Site Characteristics Database/000003.log 
