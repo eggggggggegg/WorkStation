@@ -10,10 +10,11 @@ if [[ -x /usr/bin/code || -x /usr/bin/code-insiders ]]; then
   CODE_BIN="/usr/bin/code"
   [[ -x "${CODE_BIN}" ]] || CODE_BIN="/usr/bin/code-insiders"
 
-  cat > "${BIN_DIR}/workstation-code" <<'EOF'
+  cat > "${BIN_DIR}/workstation-code" <<EOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
 export ELECTRON_OZONE_PLATFORM_HINT=x11
+export LIBGL_ALWAYS_SOFTWARE=1
 exec "${CODE_BIN}" --disable-gpu "$@"
 EOF
   chmod +x "${BIN_DIR}/workstation-code"
@@ -56,3 +57,17 @@ Type=Application
 Categories=System;PackageManager;Utility;
 StartupNotify=true
 EOF
+
+# Reliable GTK software-center launcher for CI desktops.
+if command -v gnome-software >/dev/null 2>&1; then
+  cat > "${DESKTOP_DIR}/workstation-software.desktop" <<EOF
+[Desktop Entry]
+Name=Software
+Comment=Install and manage applications
+Exec=env GDK_BACKEND=x11 gnome-software
+Terminal=false
+Type=Application
+Categories=System;PackageManager;
+StartupNotify=true
+EOF
+fi
