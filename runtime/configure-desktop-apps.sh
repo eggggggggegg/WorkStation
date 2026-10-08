@@ -14,9 +14,17 @@ if [[ -x /usr/bin/code || -x /usr/bin/code-insiders ]]; then
   # VS Code can inherit a broken/stale GPU cache from a previous desktop session.
   rm -rf "${HOME_ROOT}/.config/Code/GPUCache"
 
-  cat > "${BIN_DIR}/workstation-code" <<EOF
+  cat > "${BIN_DIR}/workstation-code" <<'EOF'
 #!/usr/bin/env bash
 set -u
+if [[ -x /usr/bin/code ]]; then
+  CODE_BIN="/usr/bin/code"
+elif [[ -x /usr/bin/code-insiders ]]; then
+  CODE_BIN="/usr/bin/code-insiders"
+else
+  echo "WorkStation: VS Code executable not found." >&2
+  exit 127
+fi
 LOG_DIR="${HOME}/.local/share/workstation/logs"
 LOG_FILE="${LOG_DIR}/vscode.log"
 ELECTRON_LOG="${LOG_DIR}/vscode-electron.log"
@@ -29,7 +37,9 @@ mkdir -p "${LOG_DIR}"
   echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY-}"
   echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE-}"
   echo "CODE_BIN=${CODE_BIN}"
-  echo "args: $*"
+  printf "args:"
+  printf " %q" "$@"
+  echo
   echo "--- version ---"
   "${CODE_BIN}" --version 2>&1 || true
   echo "--- launch ---"
@@ -52,7 +62,7 @@ EOF
 Name=Visual Studio Code
 Comment=Code editor
 Exec=${BIN_DIR}/workstation-code %U
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Development;IDE;
 StartupNotify=true
