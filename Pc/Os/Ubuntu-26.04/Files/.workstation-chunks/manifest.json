@@ -1,0 +1,24 @@
+{
+  "chunk_size": 47185920,
+  "files": {
+    "Downloads/EaglercraftX-1_8-workspace-master.zip": {
+      "chunks": [
+        "part-000001",
+        "part-000002"
+      ],
+      "mode": 420,
+      "sha256": "a496fce26035af26395ff777115919f225610e9fd837b1cbb7169f7f4449a7f9",
+      "size": 61489470
+    },
+    "cache/google-chrome/Default/Cache/Cache_Data/54ec9acbf17bf578_0": {
+      "chunks": [
+        "part-000001",
+        "part-000002"
+      ],
+      "mode": 384,
+      "sha256": "0fbd2a8e2d081645df0c6990eede89f993ca5894078e329726288d8eeb03afbd",
+      "size": 61492964
+    }
+  },
+  "format": 1
+}
