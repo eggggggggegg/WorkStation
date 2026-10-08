@@ -50,9 +50,16 @@ export LIBGL_ALWAYS_SOFTWARE=1
 export ELECTRON_ENABLE_LOGGING=1
 export ELECTRON_LOG_FILE="${ELECTRON_LOG}"
 
-"${CODE_BIN}" --disable-gpu --ozone-platform=x11 --verbose "$@" >> "${LOG_FILE}" 2>&1
+"${CODE_BIN}" --disable-gpu --ozone-platform=x11 --disable-extensions --verbose "$@" >> "${LOG_FILE}" 2>&1
 STATUS=$?
 echo "VS Code exit status: ${STATUS}" >> "${LOG_FILE}"
+if [[ "${STATUS}" -ne 0 ]]; then
+  echo
+  echo "VS Code failed to start (exit ${STATUS}). Recent diagnostics:"
+  tail -n 60 "${LOG_FILE}" 2>/dev/null || true
+  echo
+  read -r -p "Press Enter to close..." _
+fi
 exit "${STATUS}"
 EOF
   chmod +x "${BIN_DIR}/workstation-code"
