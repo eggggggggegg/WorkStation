@@ -32,25 +32,25 @@ jobs:
           ref: ${{ inputs.persistent_ref }}
           fetch-depth: 1
 
-      - name: Prepare persistent storage
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p persistent-data/home runtime/home
-          if [ -d persistent-data/home ]; then
-            cp -a persistent-data/home/. runtime/home/ || true
-          fi
-
       - name: Install Docker
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends docker.io curl
+          sudo apt-get install -y --no-install-recommends docker.io curl rsync
 
       - name: Build workstation image
         shell: bash
         run: docker build --pull -t workstation:local .
+
+      - name: Restore persistent home
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p runtime/home
+          if [ -d persistent-data/home ]; then
+            rsync -a --delete persistent-data/home/ runtime/home/
+          fi
 
       - name: Create session credentials
         id: credentials
@@ -130,8 +130,6 @@ jobs:
             echo "> Temporary Cloudflare Quick Tunnel; the URL stops working when this workflow ends."
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "WorkStation URL: $URL"
-
       - name: Keep workstation alive
         shell: bash
         run: |
@@ -144,21 +142,35 @@ jobs:
             sleep 1
           done
 
-      - name: Save persistent home
+      - name: Snapshot installed applications
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p persistent-data/system
+          docker exec workstation bash -lc 'dpkg-query -W -f="${binary:Package}\n" 2>/dev/null | sort -u' \
+            > persistent-data/system/dpkg-packages.txt || true
+          docker exec workstation bash -lc 'command -v flatpak >/dev/null && flatpak list --app --columns=application 2>/dev/null | sort -u || true' \
+            > persistent-data/system/flatpak-apps.txt || true
+
+      - name: Save complete persistent home
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p persistent-data/home
           if docker ps -a --format '{{.Names}}' | grep -qx workstation; then
-            docker cp workstation:/home/workstation/. persistent-data/home/ || true
+            rm -rf persistent-data/home.new
+            mkdir -p persistent-data/home.new
+            docker cp workstation:/home/workstation/. persistent-data/home.new/
+            rm -rf persistent-data/home
+            mv persistent-data/home.new persistent-data/home
           fi
-          rm -rf persistent-data/home/.cache persistent-data/home/.local/share/Trash
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add persistent-data/
+          git add -A persistent-data/
           if ! git diff --cached --quiet; then
-            git commit -m "chore: persist workstation home"
+            git commit -m "chore: persist complete workstation state"
             git push
           fi
