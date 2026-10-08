@@ -49,12 +49,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p runtime/home runtime/system
-          if [ -d persistent-data/home ]; then
-            rsync -a --delete persistent-data/home/ runtime/home/
-          fi
-          if [ -d persistent-data/system ]; then
-            rsync -a persistent-data/system/ runtime/system/
-          fi
+          if [ -d persistent-data/home ]; then rsync -a --delete persistent-data/home/ runtime/home/; fi
+          if [ -d persistent-data/system ]; then rsync -a persistent-data/system/ runtime/system/; fi
 
       - name: Create session credentials
         id: credentials
@@ -78,7 +74,7 @@ jobs:
           docker run -d --name workstation             --shm-size=2g             -e SELKIES_BASIC_AUTH_USER=workstation             -e SELKIES_BASIC_AUTH_PASSWORD="$SELKIES_BASIC_AUTH_PASSWORD"             -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation"             -v "$GITHUB_WORKSPACE/runtime/system:/persistent-system:ro"             -p 127.0.0.1:8080:8080             workstation:local
 
           for i in $(seq 1 300); do
-            if curl -fsS -u "workstation:$SELKIES_BASIC_AUTH_PASSWORD"                 http://127.0.0.1:8080/ >/dev/null 2>&1; then
+            if curl -fsS -u "workstation:$SELKIES_BASIC_AUTH_PASSWORD" http://127.0.0.1:8080/ >/dev/null 2>&1; then
               echo "Selkies is ready."
               break
             fi
@@ -92,9 +88,11 @@ jobs:
 
       - name: Start Cloudflare Quick Tunnel
         shell: bash
+        env:
+          SELKIES_BASIC_AUTH_PASSWORD: ${{ steps.credentials.outputs.password }}
         run: |
           set -euo pipefail
-          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64             -o /tmp/cloudflared
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared
           sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared
           nohup cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080 > /tmp/cloudflared.log 2>&1 &
 
@@ -105,18 +103,36 @@ jobs:
             sleep 1
           done
 
-          [ -n "$URL" ] || { cat /tmp/cloudflared.log; exit 1; }
+          if [ -z "$URL" ]; then
+            echo "::error::Cloudflare Quick Tunnel did not provide a URL."
+            cat /tmp/cloudflared.log
+            exit 1
+          fi
+
+          echo
+          echo "============================================================"
+          echo "                 WORKSTATION IS READY"
+          echo "============================================================"
+          echo "OPEN THIS LINK:"
+          echo "$URL"
+          echo
+          echo "USERNAME: workstation"
+          echo "PASSWORD: $SELKIES_BASIC_AUTH_PASSWORD"
+          echo "============================================================"
+          echo
 
           {
-            echo "## WorkStation is live"
+            echo "## 🖥️ WorkStation is live"
+            echo
+            echo "### 🔗 [OPEN WORKSTATION]($URL)"
             echo
             echo "**URL:** $URL"
             echo
             echo "**Username:** workstation"
             echo
-            echo "**Password:** ${{ steps.credentials.outputs.password }}"
+            echo "**Password:** $SELKIES_BASIC_AUTH_PASSWORD"
             echo
-            echo "> Temporary Cloudflare Quick Tunnel; the URL stops working when this workflow ends."
+            echo "> Temporary Cloudflare Quick Tunnel. The link stops working when this workflow ends."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep workstation alive
@@ -153,7 +169,6 @@ jobs:
             rm -rf persistent-data/home
             mv persistent-data/home.new persistent-data/home
           fi
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A persistent-data/
