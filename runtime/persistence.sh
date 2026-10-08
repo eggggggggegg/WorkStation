@@ -39,7 +39,23 @@ RSYNC_EXCLUDES=(
   --exclude='.env' --exclude='.env.*' --exclude='credentials.json' --exclude='token.json'
   --exclude='**/cookies.sqlite' --exclude='**/key4.db' --exclude='**/logins.json'
   --exclude='**/Login Data' --exclude='**/Cookies'
+  # Browser single-instance locks are runtime state. Persisting them can make a
+  # newly created container think Chrome/Firefox is still running elsewhere.
+  --exclude='**/SingletonLock' --exclude='**/SingletonSocket' --exclude='**/SingletonCookie'
+  --exclude='**/parent.lock' --exclude='**/.parentlock' --exclude='**/lock'
 )
+
+clear_browser_locks() {
+  local root="$1"
+  # These files are safe to discard when no browser is running; the desktop is
+  # not started during the initial restore, and the second restore runs before
+  # the user can launch a browser.
+  find "${root}" -type f \( \
+    -name 'SingletonLock' -o -name 'SingletonSocket' -o -name 'SingletonCookie' -o \
+    -name 'parent.lock' -o -name '.parentlock' -o -name 'lock' \
+  \) -delete 2>/dev/null || true
+}
+
 
 load_os() {
   local os="$1" target="$2" source
@@ -51,6 +67,7 @@ load_os() {
   sudo rsync -a --delete --no-owner --no-group --omit-dir-times "${RSYNC_EXCLUDES[@]}" "${source}/" "${target}/"
   command -v python3 >/dev/null 2>&1 || { echo "WorkStation: python3 is required for large-file restore" >&2; exit 1; }
   sudo python3 "${ROOT}/runtime/persist-workspace.py" load "${target}" "${source}"
+  clear_browser_locks "${target}"
 }
 
 save_os() {
@@ -58,6 +75,8 @@ save_os() {
   destination="$(safe_files_root "${os}")"
   [[ -d "${source}" ]] || { echo "source does not exist: ${source}" >&2; exit 1; }
   acquire_lock "${os}"
+  # Never snapshot stale browser single-instance locks.
+  clear_browser_locks "${source}"
   mkdir -p "${destination}"
   # The container may leave root-owned files behind; use root for the snapshot
   # so saves cannot fail merely because the desktop changed ownership.
