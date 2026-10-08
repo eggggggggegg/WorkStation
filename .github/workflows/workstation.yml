@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           command -v docker >/dev/null || { echo "Docker is not available on the GitHub runner"; exit 1; }
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends curl rsync openssl
+          sudo apt-get install -y --no-install-recommends curl rsync openssl dnsutils
 
       - name: Build workstation image
         shell: bash
@@ -71,7 +71,14 @@ jobs:
           SELKIES_BASIC_AUTH_PASSWORD: ${{ steps.credentials.outputs.password }}
         run: |
           set -euo pipefail
-          docker run -d --name workstation             --shm-size=2g             -e SELKIES_BASIC_AUTH_USER=workstation             -e SELKIES_BASIC_AUTH_PASSWORD="$SELKIES_BASIC_AUTH_PASSWORD"             -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation"             -v "$GITHUB_WORKSPACE/runtime/system:/persistent-system:ro"             -p 127.0.0.1:8080:8080             workstation:local
+          docker run -d --name workstation \
+            --shm-size=2g \
+            -e SELKIES_BASIC_AUTH_USER=workstation \
+            -e SELKIES_BASIC_AUTH_PASSWORD="$SELKIES_BASIC_AUTH_PASSWORD" \
+            -v "$GITHUB_WORKSPACE/runtime/home:/home/workstation" \
+            -v "$GITHUB_WORKSPACE/runtime/system:/persistent-system:ro" \
+            -p 127.0.0.1:8080:8080 \
+            workstation:local
 
           for i in $(seq 1 300); do
             if curl -fsS -u "workstation:$SELKIES_BASIC_AUTH_PASSWORD" http://127.0.0.1:8080/ >/dev/null 2>&1; then
@@ -86,19 +93,66 @@ jobs:
             sleep 1
           done
 
+      - name: Run stream diagnostics
+        shell: bash
+        env:
+          SELKIES_BASIC_AUTH_PASSWORD: ${{ steps.credentials.outputs.password }}
+        run: |
+          set +e
+          echo "========== SELKIES CONTAINER LOG =========="
+          docker logs workstation
+          echo
+          echo "========== PIXELFLUX IMPORT =========="
+          docker exec workstation /opt/selkies/bin/python -c 'import pixelflux; print("pixelflux import: OK"); print(pixelflux.__file__)' 2>&1
+          echo
+          echo "========== PCMFLUX IMPORT =========="
+          docker exec workstation /opt/selkies/bin/python -c 'import pcmflux; print("pcmflux import: OK"); print(pcmflux.__file__)' 2>&1
+          echo
+          echo "========== X11 DISPLAY =========="
+          docker exec workstation bash -lc 'echo DISPLAY=$DISPLAY; xdpyinfo -display "$DISPLAY" 2>&1 | head -n 30; echo "--- Xvfb ---"; cat /tmp/Xvfb.log 2>/dev/null; echo "--- DWM ---"; cat /tmp/dwm.log 2>/dev/null'
+          echo
+          echo "========== SELKIES WEBSOCKET ROUTE =========="
+          curl -sv -u "workstation:$SELKIES_BASIC_AUTH_PASSWORD" \
+            -H 'Connection: Upgrade' \
+            -H 'Upgrade: websocket' \
+            -H 'Sec-WebSocket-Version: 13' \
+            -H 'Sec-WebSocket-Key: SGVsbG9TZWxraWVzV2ViU29ja2V0' \
+            http://127.0.0.1:8080/api/websockets 2>&1 | tail -n 40
+          echo
+          echo "========== SELKIES HELP (STREAM SETTINGS) =========="
+          docker exec workstation /opt/selkies/bin/selkies --help 2>&1 | grep -E 'mode|encoder|use-cpu|display|resize' | head -n 80
+          echo
+          echo "Diagnostics complete."
+
       - name: Start Cloudflare Quick Tunnel
         shell: bash
         env:
           SELKIES_BASIC_AUTH_PASSWORD: ${{ steps.credentials.outputs.password }}
         run: |
           set -euo pipefail
+
           curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared
           sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared
-          nohup cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080 > /tmp/cloudflared.log 2>&1 &
+
+          # Keep cloudflared alive independently of this step, but record its PID
+          # so the keep-alive step can detect if the tunnel dies.
+          nohup cloudflared tunnel \
+            --no-autoupdate \
+            --protocol auto \
+            --loglevel info \
+            --url http://127.0.0.1:8080 \
+            > /tmp/cloudflared.log 2>&1 &
+          CLOUDFLARED_PID=$!
+          echo "$CLOUDFLARED_PID" > /tmp/cloudflared.pid
 
           URL=""
-          for i in $(seq 1 60); do
-            URL="$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n1 || true)"
+          for i in $(seq 1 90); do
+            if ! kill -0 "$CLOUDFLARED_PID" 2>/dev/null; then
+              echo "::error::cloudflared exited before publishing a Quick Tunnel URL."
+              cat /tmp/cloudflared.log
+              exit 1
+            fi
+            URL="$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' /tmp/cloudflared.log | tail -n1 || true)"
             [ -n "$URL" ] && break
             sleep 1
           done
@@ -108,6 +162,65 @@ jobs:
             cat /tmp/cloudflared.log
             exit 1
           fi
+
+          echo "Quick Tunnel URL published: $URL"
+
+          # A URL appearing in the log does not necessarily mean public DNS is
+          # ready yet. Wait until the generated hostname actually resolves.
+          HOST="${URL#https://}"
+          DNS_READY=false
+          for i in $(seq 1 90); do
+            if ! kill -0 "$CLOUDFLARED_PID" 2>/dev/null; then
+              echo "::error::cloudflared died while waiting for public DNS."
+              tail -n 100 /tmp/cloudflared.log
+              exit 1
+            fi
+
+            if getent ahostsv4 "$HOST" >/tmp/tunnel-dns.txt 2>/dev/null; then
+              if grep -qE '^[0-9]' /tmp/tunnel-dns.txt; then
+                DNS_READY=true
+                echo "Public DNS is resolving: $HOST"
+                cat /tmp/tunnel-dns.txt
+                break
+              fi
+            fi
+
+            sleep 1
+          done
+
+          if [ "$DNS_READY" != true ]; then
+            echo "::error::Quick Tunnel hostname was published but did not resolve from the GitHub runner."
+            echo "Hostname: $HOST"
+            echo "DNS resolver:"
+            cat /etc/resolv.conf
+            echo "Public DNS check:"
+            dig +short "$HOST" A || true
+            echo "Cloudflared log:"
+            tail -n 150 /tmp/cloudflared.log
+            exit 1
+          fi
+
+          # Verify the public route reaches the Selkies HTTP endpoint before
+          # handing the URL to the user.
+          PUBLIC_OK=false
+          for i in $(seq 1 30); do
+            HTTP_CODE="$(curl -kLsS -o /tmp/public-check.html -w '%{http_code}' --max-time 10 -u "workstation:$SELKIES_BASIC_AUTH_PASSWORD" "$URL/" 2>/dev/null || true)"
+            case "$HTTP_CODE" in
+              200|301|302|401|403)
+                PUBLIC_OK=true
+                echo "Public tunnel is reachable (HTTP $HTTP_CODE)."
+                break
+                ;;
+            esac
+            sleep 1
+          done
+
+          if [ "$PUBLIC_OK" != true ]; then
+            echo "::warning::DNS resolves, but the public HTTP check did not return an expected response yet."
+            tail -n 100 /tmp/cloudflared.log
+          fi
+
+          echo "$URL" > /tmp/workstation-url
 
           echo
           echo "============================================================"
@@ -139,11 +252,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          CLOUDFLARED_PID="$(cat /tmp/cloudflared.pid)"
+          URL="$(cat /tmp/workstation-url)"
+
+          echo "Monitoring WorkStation and Cloudflare tunnel."
+          echo "URL: $URL"
+
           for i in $(seq 1 21000); do
             if ! docker ps --format '{{.Names}}' | grep -qx workstation; then
+              echo "WorkStation container exited."
               docker logs workstation || true
               exit 1
             fi
+
+            if ! kill -0 "$CLOUDFLARED_PID" 2>/dev/null; then
+              echo "Cloudflare Quick Tunnel exited."
+              echo "========== cloudflared log =========="
+              cat /tmp/cloudflared.log || true
+              exit 1
+            fi
+
+            if [ $((i % 60)) -eq 0 ]; then
+              echo "[$i sec] WorkStation + tunnel are alive."
+              tail -n 10 /tmp/cloudflared.log || true
+            fi
+
             sleep 1
           done
 
@@ -173,6 +307,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A persistent-data/
           if ! git diff --cached --quiet; then
-            git commit -m "chore: persist complete workstation state"
+            git commit -m "fix: verify and monitor Quick Tunnel"
             git push
           fi
