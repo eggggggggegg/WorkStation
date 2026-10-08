@@ -8,7 +8,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus-x11 sudo curl wget git ca-certificates python3 python3-pip python3-venv \
     firefox xterm dwm x11-xserver-utils x11-utils xdotool xauth xvfb \
-    libgl1 libegl1 libgbm1 libdrm2 libx11-6 libxext6 libxfixes3 libxdamage1 \
+    libgl1 libegl1 libgbm1 libdrm2 libva2 libva-drm2 libva-x11-2 \
+    libx11-6 libxext6 libxfixes3 libxdamage1 \
     libxcomposite1 libxrandr2 libxi6 libxtst6 libxcb1 libpulse0 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -s /bin/bash workstation \
